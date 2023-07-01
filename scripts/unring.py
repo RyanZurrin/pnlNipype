@@ -20,11 +20,11 @@ def _unring(vol):
 
     img= load(vol)
     unringed= gibbs_removal(img.get_fdata())
-    
+
     outPrefix= vol.split('.nii')[0]+ '_ur'
-    
+
     new_image= Nifti1Image(unringed, affine= img.affine, header= img.header)
-    new_image.to_filename(outPrefix+'.nii.gz')
+    new_image.to_filename(f'{outPrefix}.nii.gz')
 
 
 
@@ -34,21 +34,21 @@ def main():
     outPrefix= abspath(sys.argv[2])
     if not isfile(filename):
         raise FileNotFoundError(f'{filename} does not exist')
-    
-    
-    with TemporaryDirectory() as tmpdir, local.cwd(tmpdir):
+
+
+    with (TemporaryDirectory() as tmpdir, local.cwd(tmpdir)):
         
         tmpdir= local.path(tmpdir)
 
         print('Working directory', tmpdir)
-        
+
         fslsplit(filename, 'dwi', '-t')
-        
+
         volumes= glob('dwi*.nii.gz')
         volumes.sort()
 
         sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
-        
+
         try:
             N_CPU= int(sys.argv[3])
         except:
@@ -63,15 +63,15 @@ def main():
         else:
             pool.close()
         pool.join()
-        
-        
+
+
         volumes= glob('dwi*_ur.nii.gz')
         volumes.sort()
-        fslmerge['-t', outPrefix+'.nii.gz', volumes] & FG
+        fslmerge['-t', f'{outPrefix}.nii.gz', volumes] & FG
 
-    inPrefix= filename.split('.nii')[0] 
-    copyfile(inPrefix+'.bval', outPrefix+'.bval')
-    copyfile(inPrefix+'.bvec', outPrefix+'.bvec')
+    inPrefix= filename.split('.nii')[0]
+    copyfile(f'{inPrefix}.bval', f'{outPrefix}.bval')
+    copyfile(f'{inPrefix}.bvec', f'{outPrefix}.bvec')
 
 
 if __name__=='__main__':

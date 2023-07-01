@@ -32,8 +32,8 @@ class App(cli.Application):
             tmpdir = local.path(tmpdir)
             pre = tmpdir / 'ants'
 
-            warp = pre + '1Warp.nii.gz'
-            affine = pre + '0GenericAffine.mat'
+            warp = f'{pre}1Warp.nii.gz'
+            affine = f'{pre}0GenericAffine.mat'
 
             check_call((' ').join([pjoin(FILEDIR,'antsRegistrationSyNMI.sh'),
                         '-f', self.target,

@@ -158,11 +158,11 @@ class TopupEddyEpi(cli.Application):
             print('eddy_openmp/cuda parameters')
             print(eddy_openmp_params)
             print('')
-            
+
             # eddy_openmp yields as many volumes as there are input volumes
             # this is the main output and consists of the input data after correction for
             # eddy currents, subject movement, and susceptibility if --topup was specified
-            
+
             eddy_openmp[f'--imain={modData}',
                         f'--mask={topupMask}',
                         f'--acqp={self.acqparams_file}',
@@ -177,7 +177,7 @@ class TopupEddyEpi(cli.Application):
             # free space, see https://github.com/pnlbwh/pnlNipype/issues/82
             if '--repol' in eddy_openmp_params:
                 rm[f'{outPrefix}.eddy_outlier_free_data.nii.gz'] & FG
-                    
+
             bvals = np.array(read_bvals(modBvals))
             ind= [i for i in range(len(bvals)) if bvals[i]>B0_THRESHOLD and bvals[i]<= REPOL_BSHELL_GREATER]
 
@@ -206,30 +206,38 @@ class TopupEddyEpi(cli.Application):
                             eddy_openmp_params] & FG
 
 
-                repol_bvecs = np.array(read_bvecs(outPrefix + '.eddy_rotated_bvecs'))
-                wo_repol_bvecs = np.array(read_bvecs(wo_repol_outPrefix + '.eddy_rotated_bvecs'))
+                repol_bvecs = np.array(read_bvecs(f'{outPrefix}.eddy_rotated_bvecs'))
+                wo_repol_bvecs = np.array(
+                    read_bvecs(f'{wo_repol_outPrefix}.eddy_rotated_bvecs')
+                )
 
                 merged_bvecs = repol_bvecs.copy()
                 merged_bvecs[ind, :] = wo_repol_bvecs[ind, :]
 
-                repol_data = load_nifti(outPrefix + '.nii.gz')
-                wo_repol_data = load_nifti(wo_repol_outPrefix + '.nii.gz')
+                repol_data = load_nifti(f'{outPrefix}.nii.gz')
+                wo_repol_data = load_nifti(f'{wo_repol_outPrefix}.nii.gz')
                 merged_data = repol_data.get_fdata().copy()
                 merged_data[..., ind] = wo_repol_data.get_fdata()[..., ind]
 
-                save_nifti(outPrefix + '.nii.gz', merged_data, repol_data.affine, hdr=repol_data.header)
+                save_nifti(
+                    f'{outPrefix}.nii.gz',
+                    merged_data,
+                    repol_data.affine,
+                    hdr=repol_data.header,
+                )
 
                 # copy bval,bvec to have same prefix as that of eddy corrected volume
-                write_bvecs(outPrefix + '.bvec', merged_bvecs)
-                copyfile(modBvals, outPrefix + '.bval')
-                
+                write_bvecs(f'{outPrefix}.bvec', merged_bvecs)
+                copyfile(modBvals, f'{outPrefix}.bval')
+
                 # clean up
                 rm['-r', wo_repol_outDir] & FG
 
             else:
                 # copy bval,bvec to have same prefix as that of eddy corrected volume
-                copyfile(outPrefix + '.eddy_rotated_bvecs', outPrefix + '.bvec')
-                copyfile(modBvals, outPrefix + '.bval')
+                copyfile(f'{outPrefix}.eddy_rotated_bvecs', f'{outPrefix}.bvec')
+                copyfile(modBvals, f'{outPrefix}.bval')
+
 
 
 
@@ -254,7 +262,7 @@ class TopupEddyEpi(cli.Application):
             primaryMask = abspath(temp[0])
             if len(temp) == 2:
                 secondaryMask = abspath(temp[1])
-        
+
 
 
         # obtain 4D/3D info and time axis info
@@ -337,7 +345,7 @@ class TopupEddyEpi(cli.Application):
             logging.info('Writing acqparams.txt for topup')
 
             # firstDim: first acqp line should be replicated this number of times
-            firstB0dim= load_nifti(str(B0_PA)).header['dim'][4]
+            firstB0dim = load_nifti(B0_PA).header['dim'][4]
             # secondDim: second acqp line should be replicated this number of times
             secondB0dim= load_nifti(str(B0_AP)).header['dim'][4]
             acqp_topup= 'acqp_topup.txt'
@@ -368,7 +376,7 @@ class TopupEddyEpi(cli.Application):
             logging.info('Running topup')
             topup_results= 'topup_out'
             topupOut= 'topup_out.nii.gz'
-            
+
             # topup --iout yields as many volumes as there are input volumes
             # --iout specifies the name of a 4D image file that contains unwarped and movement corrected images.
             # each volume in the --imain will have a corresponding corrected volume in --iout.
@@ -380,18 +388,18 @@ class TopupEddyEpi(cli.Application):
                   f'--out={topup_results}',
                   f'--iout={topupOut}',
                   topup_params.split()] & FG
-            
+
             # provide topupOutMean for quality checking
             topupOutMean= 'topup_out_mean.nii.gz'
             fslmaths[topupOut, '-Tmean', topupOutMean] & FG
-            
-            
+
+
             logging.info('Running applytopup')
 
             # applytopup always yields one output file regardless of one or two input files
             # if two input files are provided, the resulting undistorted file will be a combination of the two
             # containing only as many volumes as there are in one file
-            
+
             # B0_PA_correct, B0_AP_correct are for quality checking only
             # primaryMaskCorrect, secondaryMaskCorrect will be associated masks
             B0_PA_correct= 'B0_PA_corrected.nii.gz'
@@ -415,7 +423,7 @@ class TopupEddyEpi(cli.Application):
             fslmaths[B0_PA_AP_corrected_merged, '-Tmean', 'B0_PA_AP_corrected_mean'] & FG
 
 
-            
+
             topupMask= 'topup_mask.nii.gz'
 
             # calculate topup mask
@@ -425,7 +433,7 @@ class TopupEddyEpi(cli.Application):
                 fslmaths[secondaryMask, '-mul', '1', secondaryMask, '-odt', 'float']
 
                 applytopup_params+=' --interp=trilinear'
-                
+
                 # this straightforward way could be used
                 '''
                 applytopup[f'--imain={primaryMask},{secondaryMask}',
@@ -436,7 +444,7 @@ class TopupEddyEpi(cli.Application):
                            applytopup_params.split()] & FG
                 '''
                 # but let's do it step by step in order to have more control of the process
-                
+
 
 
                 # binarise the mean of corrected primary,secondary mask to obtain modified mask
@@ -469,7 +477,7 @@ class TopupEddyEpi(cli.Application):
                 # scale=2 seems sufficient
                 data= single_scale(data, int(self.scale))
                 save_nifti(topupMask, data.astype('uint8'), temp.affine, temp.header)
-                
+
 
             else:
                 # this block assumes the primary4D,secondary4D/3D are already masked
@@ -482,9 +490,9 @@ class TopupEddyEpi(cli.Application):
                 # apply bet on the mean of topup output to obtain modified mask
                 # use that mask for eddy_openmp
                 bet[topupOutMean, topupMask.split('_mask.nii.gz')[0], '-m', '-n'] & FG
-                
 
-                
+
+
 
             logging.info('Writing index.txt for topup')
             indexFile= 'index.txt'
@@ -492,10 +500,10 @@ class TopupEddyEpi(cli.Application):
                 for i in range(numVol1):
                     f.write('1\n')
 
-            
+
 
             outPrefix = basename(primaryVol).split('.nii')[0]
-            
+
             # remove _acq- 
             outPrefix= outPrefix.replace('_acq-PA','')
             outPrefix= outPrefix.replace('_acq-AP','')
@@ -506,10 +514,10 @@ class TopupEddyEpi(cli.Application):
                 outPrefix= local.path(re.sub('_dir-(.+?)_', f'_dir-{dir}_', outPrefix))
 
 
-            outPrefix = outPrefix + '_EdEp'
+            outPrefix = f'{outPrefix}_EdEp'
             with open('.outPrefix.txt', 'w') as f:
                 f.write(outPrefix)
-            
+
 
 
             temp = self.whichVol.split(',')
@@ -558,13 +566,13 @@ class TopupEddyEpi(cli.Application):
 
 
                 _eddy_openmp(combinedData, combinedBvals, combinedBvecs, eddy_openmp_params)
-                
+
 
             else:
                 raise ValueError('Invalid --whichVol')
 
             # rename topupMask to have same prefix as that of eddy corrected volume
-            move(topupMask, outPrefix + '_mask.nii.gz')
+            move(topupMask, f'{outPrefix}_mask.nii.gz')
 
 
 

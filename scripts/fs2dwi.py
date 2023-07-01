@@ -17,8 +17,8 @@ def rigid_registration(dim, moving, fixed, outPrefix):
 def registerFs2Dwi(tmpdir, namePrefix, b0masked, brain, wmparc, wmparc_out):
 
     pre = tmpdir / namePrefix
-    affine = pre + '0GenericAffine.mat'
-    warp = pre + '1Warp.nii.gz'
+    affine = f'{pre}0GenericAffine.mat'
+    warp = f'{pre}1Warp.nii.gz'
 
     print('Computing warp from brain.nii.gz to (resampled) baseline')
     check_call((' ').join([pjoin(FILEDIR,'antsRegistrationSyNMI.sh'), '-d', '3', '-m', brain, '-f', b0masked, '-o', pre
@@ -29,7 +29,7 @@ def registerFs2Dwi(tmpdir, namePrefix, b0masked, brain, wmparc, wmparc_out):
                         '-r', b0masked, '-o', wmparc_out,
                         '--interpolation', 'NearestNeighbor')
 
-    print('Made ' + wmparc_out)
+    print(f'Made {wmparc_out}')
 
 
 # The functions registerFs2Dwi and registerFs2Dwi_T2 differ by the use of t2masked, T2toBrainAffine, and a print statement
@@ -38,8 +38,8 @@ def registerFs2Dwi(tmpdir, namePrefix, b0masked, brain, wmparc, wmparc_out):
 def registerFs2Dwi_T2(tmpdir, namePrefix, b0masked, t2masked, BrainToT2Affine, wmparc, wmparc_out):
 
     pre = tmpdir / namePrefix
-    affine = pre + '0GenericAffine.mat'
-    warp = pre + '1Warp.nii.gz'
+    affine = f'{pre}0GenericAffine.mat'
+    warp = f'{pre}1Warp.nii.gz'
 
     print('Computing warp from t2 to (resampled) baseline')
     check_call((' ').join([pjoin(FILEDIR,'antsRegistrationSyNMI.sh'), '-d', '3', '-m', t2masked, '-f', b0masked, '-o', pre
@@ -50,7 +50,7 @@ def registerFs2Dwi_T2(tmpdir, namePrefix, b0masked, t2masked, BrainToT2Affine, w
                         '-r', b0masked, '-o', wmparc_out,
                         '--interpolation', 'NearestNeighbor')
 
-    print('Made ' + wmparc_out)
+    print(f'Made {wmparc_out}')
 
 
 class FsToDwi(cli.Application):
@@ -195,7 +195,7 @@ class Direct(cli.Application):
                 wmparcinbrain.copy(self.parent.out)
 
             if self.parent.debug:
-                tmpdir.copy(self.parent.out, 'fs2dwi-debug-' + str(os.getpid()))
+                tmpdir.copy(self.parent.out, f'fs2dwi-debug-{os.getpid()}')
 
 
         print('See output files in ', self.parent.out._path)
@@ -261,7 +261,7 @@ class WithT2(cli.Application):
 
             # rigid registration from brain.nii.gz to t2
             pre = tmpdir / 'BrainToT2'
-            BrainToT2Affine = pre + '0GenericAffine.mat'
+            BrainToT2Affine = f'{pre}0GenericAffine.mat'
 
             print('Computing rigid registration from brain.nii.gz to t2')
             rigid_registration(3, brain, t2masked, pre)
@@ -304,7 +304,7 @@ class WithT2(cli.Application):
                 wmparcinbrain.copy(self.parent.out)
 
             if self.parent.debug:
-                tmpdir.copy(self.parent.out, 'fs2dwi-debug-' + str(os.getpid()))
+                tmpdir.copy(self.parent.out, f'fs2dwi-debug-{os.getpid()}')
 
 
         print('See output files in ', self.parent.out._path)

@@ -18,9 +18,7 @@ def findLargestConnectMask(img):
             maxLabel = region.label
             maxArea = region.area
 
-    largeConnectMask = (mask == maxLabel)
-
-    return largeConnectMask
+    return (mask == maxLabel)
 
 
 

@@ -87,11 +87,12 @@ def applyWarp(moving, warp, reference, out, interpolation='Linear'):
 
 def computeMI(target, img, miFile):
 
-    if ANTS_VERSION <= '2.1.0':
-        (MeasureImageSimilarity['3', '2', target, img] | head['-n', '-2'] | cut['-d ', '-f6'] > miFile)()
+      if ANTS_VERSION <= '2.1.0':
+            (MeasureImageSimilarity['3', '2', target, img] | head['-n', '-2'] | cut['-d ', '-f6'] > miFile)()
 
-    else:
-        (MeasureImageSimilarity['-d', '3', '-m', 'MI[{},{},1,256]'.format(target, img)] > miFile) & FG
+      else:
+            (MeasureImageSimilarity['-d', '3', '-m',
+                                    f'MI[{target},{img},1,256]'] > miFile) & FG
 
 
 def weightsFromMIExp(mis, alpha):
@@ -101,17 +102,19 @@ def weightsFromMIExp(mis, alpha):
 
 def fuseWeightedAvg(labels, weights, out, target_header):
 
-    # for each label, fuse warped labelmaps to compute output labelmap
-    print("Apply weights to warped training {} et al., fuse, and threshold".format(labels[0]))
-    data= np.zeros(target_header['dim'][1:4], dtype= 'float32')
-    for label, w in zip(labels, weights):
-        data+= load_nifti(label._path).get_data()*w
+          # for each label, fuse warped labelmaps to compute output labelmap
+      print(
+          f"Apply weights to warped training {labels[0]} et al., fuse, and threshold"
+      )
+      data= np.zeros(target_header['dim'][1:4], dtype= 'float32')
+      for label, w in zip(labels, weights):
+          data+= load_nifti(label._path).get_data()*w
 
 
-    # out is {labelname}.nii.gz
-    save_nifti(out, ((data>0.5)*1).astype('uint8'), target_header.get_best_affine(), target_header)
+      # out is {labelname}.nii.gz
+      save_nifti(out, ((data>0.5)*1).astype('uint8'), target_header.get_best_affine(), target_header)
 
-    print("Made labelmap: " + out)
+      print("Made labelmap: " + out)
 
 
 def fuseAntsJointFusion(target, images, labels, out):
@@ -151,124 +154,126 @@ def fuseAvg(labels, out, target_header):
 
 def train2target(itr):
 
-    idx, attr = itr
-    outdir, target= attr[-2: ]
-    r= attr[:-2]
+      idx, attr = itr
+      outdir, target= attr[-2: ]
+      r= attr[:-2]
 
-    print('Registering image {} to target'.format(idx))
-    warp = outdir / 'warp{}.nii.gz'.format(idx)
-    atlas = outdir / 'atlas{}.nii.gz'.format(idx)
-    logging.info('Making {}'.format(atlas))
+      print(f'Registering image {idx} to target')
+      warp = outdir / f'warp{idx}.nii.gz'
+      atlas = outdir / f'atlas{idx}.nii.gz'
+      logging.info(f'Making {atlas}')
 
-    # warp is computed among the first column images and the target image
-    # then that warp is applied to images in other columns
-    # assuming first column of the dictionary contains moving images
-    computeWarp(r[0], target, warp)  # first column of each row is used here
-    applyWarp(r[0], warp, target, atlas)  # first column of each row is used here
+      # warp is computed among the first column images and the target image
+      # then that warp is applied to images in other columns
+      # assuming first column of the dictionary contains moving images
+      computeWarp(r[0], target, warp)  # first column of each row is used here
+      applyWarp(r[0], warp, target, atlas)  # first column of each row is used here
 
-    # labelname is the column header and label is the image in the csv file
-    for labelname, label in r.iloc[1:].iteritems():  # rest of the columns of each row are used here
-        atlaslabel = outdir / '{}{}.nii.gz'.format(labelname,idx)
-        logging.info('Making {}'.format(atlaslabel))
+          # labelname is the column header and label is the image in the csv file
+      for labelname, label in r.iloc[1:].iteritems():  # rest of the columns of each row are used here
+            atlaslabel = outdir / f'{labelname}{idx}.nii.gz'
+            logging.info(f'Making {atlaslabel}')
 
-        # creates {labelname}{idx}.nii.gz in the output directory
-        # applying Warp{idx}.nii.gz on each image under 'labelname' column in the csv file
+            # creates {labelname}{idx}.nii.gz in the output directory
+            # applying Warp{idx}.nii.gz on each image under 'labelname' column in the csv file
 
 
-        applyWarp(label,
-                  warp,
-                  target,
-                  atlaslabel,
-                  interpolation='NearestNeighbor')
+            applyWarp(label,
+                      warp,
+                      target,
+                      atlaslabel,
+                      interpolation='NearestNeighbor')
 
 
 def makeAtlases(target, trainingTable, outPrefix, fusion, threads, debug):
 
-    with TemporaryDirectory() as tmpdir:
+      with TemporaryDirectory() as tmpdir:
 
-        tmpdir = local.path(tmpdir)
+            tmpdir = local.path(tmpdir)
 
-        L= len(trainingTable)
+            L= len(trainingTable)
 
-        multiDataFrame= pd.concat([trainingTable, pd.DataFrame({'tmpdir': [tmpdir]*L, 'target': [str(target)]*L})], axis= 1)
+            multiDataFrame= pd.concat([trainingTable, pd.DataFrame({'tmpdir': [tmpdir]*L, 'target': [str(target)]*L})], axis= 1)
 
-        logging.info('Create {} atlases: compute transforms from images to target and apply over images'.format(L))
+            logging.info(
+                f'Create {L} atlases: compute transforms from images to target and apply over images'
+            )
 
-        pool = multiprocessing.Pool(threads)  # Use all available cores, otherwise specify the number you want as an argument
+            pool = multiprocessing.Pool(threads)  # Use all available cores, otherwise specify the number you want as an argument
 
-        pool.map_async(train2target, multiDataFrame.iterrows())
-
-        pool.close()
-        pool.join()
-
-        logging.info('Fuse warped labelmaps to compute output labelmaps')
-        atlasimages = tmpdir // 'atlas*.nii.gz'
-        # sorting is required for applying weight to corresponding labelmap
-        atlasimages.sort()
-
-        if fusion.lower() == 'wavg':
-
-            ALPHA_DEFAULT= 0.45
-
-            logging.info('Compute MI between warped images and target')
-            pool = multiprocessing.Pool(threads)
-            for img in atlasimages:
-                print('MI between {} and target'.format(img))
-                miFile= img+'.txt'
-                pool.apply_async(func= computeMI, args= (target, img, miFile, ))
+            pool.map_async(train2target, multiDataFrame.iterrows())
 
             pool.close()
             pool.join()
 
-            mis= []
-            with open(tmpdir+'/MI.txt','w') as fw:
+            logging.info('Fuse warped labelmaps to compute output labelmaps')
+            atlasimages = tmpdir // 'atlas*.nii.gz'
+            # sorting is required for applying weight to corresponding labelmap
+            atlasimages.sort()
 
-                for img in atlasimages:
-                    with open(img+'.txt') as f:
-                        mi= f.read().strip()
-                        fw.write(img+','+mi+'\n')
-                        mis.append(float(mi))
+            if fusion.lower() == 'wavg':
 
-            weights = weightsFromMIExp(mis, ALPHA_DEFAULT)
+                  ALPHA_DEFAULT= 0.45
 
-        target_header= load_nifti(target._path).header
-        pool = multiprocessing.Pool(threads)  # Use all available cores, otherwise specify the number you want as an argument
-        for labelname in list(trainingTable)[1:]:  # list(d) gets column names
+                  logging.info('Compute MI between warped images and target')
+                  pool = multiprocessing.Pool(threads)
+                  for img in atlasimages:
+                        print(f'MI between {img} and target')
+                        miFile= img+'.txt'
+                        pool.apply_async(func= computeMI, args= (target, img, miFile, ))
 
-            out = os.path.abspath(outPrefix+ f'_{labelname}.nii.gz')
-            if os.path.exists(out):
-                os.remove(out)
-            labelmaps = tmpdir // (labelname + '*')
-            labelmaps.sort()
+                  pool.close()
+                  pool.join()
 
-            if fusion.lower() == 'avg':
-                print(' ')
-                # parellelize
-                # fuseAvg(labelmaps, out, target_header)
-                pool.apply_async(func= fuseAvg, args= (labelmaps, out, target_header, ))
+                  mis= []
+                  with open(tmpdir+'/MI.txt','w') as fw:
 
-            elif fusion.lower() == 'antsjointfusion':
-                print(' ')
-                # atlasimages are the warped images
-                # labelmaps are the warped labels
-                # parellelize
-                # fuseAntsJointFusion(target, atlasimages, labelmaps, out)
-                pool.apply_async(func= fuseAntsJointFusion, args= (target, atlasimages, labelmaps, out, ))
+                      for img in atlasimages:
+                          with open(img+'.txt') as f:
+                              mi= f.read().strip()
+                              fw.write(img+','+mi+'\n')
+                              mis.append(float(mi))
 
-            elif fusion.lower() == 'wavg':
-                print(' ')
-                # parellelize
-                # fuseWeightedAvg(labelmaps, weights, out, target_header)
-                pool.apply_async(func= fuseWeightedAvg, args= (labelmaps, weights, out, target_header, ))
+                  weights = weightsFromMIExp(mis, ALPHA_DEFAULT)
 
-            else:
-                print('Unrecognized fusion option: {}. Skipping.'.format(fusion))
+            target_header= load_nifti(target._path).header
+            pool = multiprocessing.Pool(threads)  # Use all available cores, otherwise specify the number you want as an argument
+            for labelname in list(trainingTable)[1:]:  # list(d) gets column names
 
-        pool.close()
-        pool.join()
+                  out = os.path.abspath(outPrefix+ f'_{labelname}.nii.gz')
+                  if os.path.exists(out):
+                      os.remove(out)
+                  labelmaps = tmpdir // (labelname + '*')
+                  labelmaps.sort()
 
-        if debug:
-            tmpdir.copy(pjoin(dirname(outPrefix), 'atlas-debug-' + str(os.getpid())))
+                  if fusion.lower() == 'avg':
+                        print(' ')
+                        # parellelize
+                        # fuseAvg(labelmaps, out, target_header)
+                        pool.apply_async(func= fuseAvg, args= (labelmaps, out, target_header, ))
+
+                  elif fusion.lower() == 'antsjointfusion':
+                      print(' ')
+                      # atlasimages are the warped images
+                      # labelmaps are the warped labels
+                      # parellelize
+                      # fuseAntsJointFusion(target, atlasimages, labelmaps, out)
+                      pool.apply_async(func= fuseAntsJointFusion, args= (target, atlasimages, labelmaps, out, ))
+
+                  elif fusion.lower() == 'wavg':
+                      print(' ')
+                      # parellelize
+                      # fuseWeightedAvg(labelmaps, weights, out, target_header)
+                      pool.apply_async(func= fuseWeightedAvg, args= (labelmaps, weights, out, target_header, ))
+
+                  else:
+                        print(f'Unrecognized fusion option: {fusion}. Skipping.')
+
+            pool.close()
+            pool.join()
+
+            if debug:
+                  tmpdir.copy(pjoin(dirname(outPrefix), f'atlas-debug-{os.getpid()}'))
 
 
 class Atlas(cli.Application):
@@ -321,19 +326,19 @@ class AtlasCsv(cli.Application):
     # @cli.positional(cli.ExistingFile)
     def main(self):
         
-        if self.csvFile=='t1' or self.csvFile=='t2':
-            PNLPIPE_SOFT = os.getenv('PNLPIPE_SOFT')
-            if not PNLPIPE_SOFT:
-                raise EnvironmentError('Define the environment variable PNLPIPE_SOFT from where training data could be obtained')
+          if self.csvFile in ['t1', 't2']:
+                PNLPIPE_SOFT = os.getenv('PNLPIPE_SOFT')
+                if not PNLPIPE_SOFT:
+                    raise EnvironmentError('Define the environment variable PNLPIPE_SOFT from where training data could be obtained')
 
-        if self.csvFile=='t1':
-            self.csvFile=glob(PNLPIPE_SOFT+'/trainingDataT1AHCC-*/trainingDataT1Masks-hdr.csv')[0]
-        elif self.csvFile=='t2':
-            self.csvFile=glob(PNLPIPE_SOFT+'/trainingDataT2Masks-*/trainingDataT2Masks-hdr.csv')[0]
-        
-        trainingTable = pd.read_csv(self.csvFile)
-        makeAtlases(self.target, trainingTable, self.out, self.fusions, int(self.threads), self.debug)
-        logging.info('Made ' + self.out + '_*.nii.gz')
+          if self.csvFile=='t1':
+              self.csvFile=glob(PNLPIPE_SOFT+'/trainingDataT1AHCC-*/trainingDataT1Masks-hdr.csv')[0]
+          elif self.csvFile=='t2':
+              self.csvFile=glob(PNLPIPE_SOFT+'/trainingDataT2Masks-*/trainingDataT2Masks-hdr.csv')[0]
+
+          trainingTable = pd.read_csv(self.csvFile)
+          makeAtlases(self.target, trainingTable, self.out, self.fusions, int(self.threads), self.debug)
+          logging.info('Made ' + self.out + '_*.nii.gz')
 
 
 if __name__ == '__main__':

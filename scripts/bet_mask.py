@@ -76,7 +76,7 @@ class App(cli.Application):
 
         if dim==4:
             if not self.bval_file:
-                self.bval_file = os.path.join(directory, prefix + '.bval')
+                self.bval_file = os.path.join(directory, f'{prefix}.bval')
 
             bet_mask(self.img._path, self.out, 4, self.bval_file, thr= self.bet_threshold)
 

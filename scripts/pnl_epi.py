@@ -81,7 +81,7 @@ class App(cli.Application):
 
         self.out = local.path(self.out)
         if not self.force and self.out.exists():
-            logging.error('{} already exists, use --force to force overwrite.'.format(self.out))
+            logging.error(f'{self.out} already exists, use --force to force overwrite.')
             sys.exit(1)
 
 
@@ -116,13 +116,28 @@ class App(cli.Application):
             fixed = t2inbse
             pre = tmpdir / 'epi'
             dwiepi = tmpdir / 'dwiepi.nii.gz'
-            antsRegistration('-d', '3', '-m',
-                             'cc[' + str(fixed) + ',' + str(moving) + ',1,2]', '-t',
-                             'SyN[0.25,3,0]', '-c', '50x50x10', '-f', '4x2x1',
-                             '-s', '2x1x0', '--restrict-deformation', '0x1x0',
-                             '-v', '1', '-o', pre)
+            antsRegistration(
+                '-d',
+                '3',
+                '-m',
+                f'cc[{str(fixed)},{str(moving)},1,2]',
+                '-t',
+                'SyN[0.25,3,0]',
+                '-c',
+                '50x50x10',
+                '-f',
+                '4x2x1',
+                '-s',
+                '2x1x0',
+                '--restrict-deformation',
+                '0x1x0',
+                '-v',
+                '1',
+                '-o',
+                pre,
+            )
 
-            local.path(str(pre) + '0Warp.nii.gz').move(epiwarp)
+            local.path(f'{str(pre)}0Warp.nii.gz').move(epiwarp)
 
             logging.info('5. Apply warp to the DWI')
             check_call((' ').join([pjoin(FILEDIR, 'antsApplyTransformsDWI.py'), '-i', self.dwi, '-m', self.dwimask,
@@ -135,19 +150,19 @@ class App(cli.Application):
             # WarpTimeSeriesImageMultiTransform('4', dwimasked, dwiepi, '-R', dwimasked, '-i', epiwarp)
 
             logging.info('6. Apply warp to the DWI mask')
-            epimask = self.out._path+'_mask.nii.gz'
+            epimask = f'{self.out._path}_mask.nii.gz'
             antsApplyTransforms('-d', '3', '-i', self.dwimask, '-o', epimask,
                                 '-n', 'NearestNeighbor', '-r', bse, '-t', epiwarp)
             fslmaths(epimask, '-mul', '1', epimask, '-odt', 'char')
 
 
-            dwiepi.move(self.out._path+'.nii.gz')
-            self.bvals_file.copy(self.out._path+'.bval')
-            self.bvecs_file.copy(self.out._path+'.bvec')
+            dwiepi.move(f'{self.out._path}.nii.gz')
+            self.bvals_file.copy(f'{self.out._path}.bval')
+            self.bvecs_file.copy(f'{self.out._path}.bvec')
 
 
             if self.debug:
-                tmpdir.copy(self.out.dirname / ('epi-debug-' + str(getpid())))
+                tmpdir.copy(self.out.dirname / f'epi-debug-{str(getpid())}')
 
 
 if __name__ == '__main__':

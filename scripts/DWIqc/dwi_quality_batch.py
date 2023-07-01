@@ -30,11 +30,7 @@ def dwi_quality_wrapper(imgPath, maskPath, bvalFile, bvecFile,
 
 def summarize_csvs(imgs, labelMapFile, lut, qcDir, labelName, out_csv):
 
-    # extract case names from imgs
-    cases=[]
-    for imgPath in imgs:
-        cases.append(basename(imgPath).split('.')[0])
-
+    cases = [basename(imgPath).split('.')[0] for imgPath in imgs]
     # extract region names from labelMap
     outLabelMap = nib.load(labelMapFile).get_data()
     labels = np.unique(outLabelMap)[1:]

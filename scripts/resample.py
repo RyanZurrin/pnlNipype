@@ -40,7 +40,7 @@ def main():
 
     if img.header['dim'][0]==4:
         # DWI
-        with TemporaryDirectory() as tmpdir, local.cwd(tmpdir):
+        with (TemporaryDirectory() as tmpdir, local.cwd(tmpdir)):
 
             tmpdir= local.path(tmpdir)
 
@@ -68,22 +68,33 @@ def main():
             volumes.sort()
 
             print('Merging 3Ds')
-            fslmerge['-t', outPrefix+'.nii.gz', volumes] & FG
+            fslmerge['-t', f'{outPrefix}.nii.gz', volumes] & FG
 
         inPrefix= filename.split('.nii')[0]
-        copyfile(inPrefix+'.bval', outPrefix+'.bval')
-        copyfile(inPrefix+'.bvec', outPrefix+'.bvec')
+        copyfile(f'{inPrefix}.bval', f'{outPrefix}.bval')
+        copyfile(f'{inPrefix}.bvec', f'{outPrefix}.bvec')
+
+    elif sum(np.unique(img.get_fdata()))==1:
+        ResampleImage(
+            '3',
+            args.input,
+            f'{outPrefix}.nii.gz',
+            args.size,
+            args.size_spacing,
+            '1',
+            '2',
+        )
 
     else:
-        # mask
-        if sum(np.unique(img.get_fdata()))==1:
-            ResampleImage('3', args.input, outPrefix+'.nii.gz', args.size, args.size_spacing,
-                          '1', '2')
-
-        # T1w/T2w
-        else:
-            ResampleImage('3', args.input, outPrefix+'.nii.gz', args.size, args.size_spacing,
-                          args.order, '5' if args.order==4 else '')
+        ResampleImage(
+            '3',
+            args.input,
+            f'{outPrefix}.nii.gz',
+            args.size,
+            args.size_spacing,
+            args.order,
+            '5' if args.order == 4 else '',
+        )
 
 
 

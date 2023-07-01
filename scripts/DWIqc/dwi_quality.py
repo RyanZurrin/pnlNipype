@@ -39,11 +39,8 @@ def save_map(outFile, img, affine= None, hdr= None):
 
 
 def hist_calc(a, bins):
-    hist_string= []
     N= len(bins)
-    for i in range(N-1):
-        hist_string.append(f'{bins[i]} <--> {bins[i+1]}')
-
+    hist_string = [f'{bins[i]} <--> {bins[i + 1]}' for i in range(N-1)]
     temp= np.histogram(a, bins=bins)[0]
     hist= temp.astype('float')/a.size
 

@@ -35,22 +35,22 @@ class App(cli.Application):
         vtks = [(caseid, vtk) for (caseid, d) in tuples for vtk in d // '*.vtk']
         keyfn = lambda x : local.path(x).name[:-4]
         groupedvtks = itertools.groupby(sorted(vtks, key=keyfn), key=keyfn)
-        
+
         self.out=local.path(self.out)
         if self.out.exists():
             self.out.delete()
         self.out.mkdir()
-        
+
         for group, vtks in groupedvtks:
             vtkdir = self.out / group
-            qcdir = self.out / (group + '-qc')
-            print("Make symlinks for vtk group {}".format(group))
+            qcdir = self.out / f'{group}-qc'
+            print(f"Make symlinks for vtk group {group}")
             vtkdir.mkdir()
             for (caseid, vtk) in vtks:
-                symlink = vtkdir / (vtk.name[:-4] + '_' + caseid + '.vtk')
-                print("Make symlink for caseid '{}': {}".format(caseid, symlink))
+                symlink = vtkdir / f'{vtk.name[:-4]}_{caseid}.vtk'
+                print(f"Make symlink for caseid '{caseid}': {symlink}")
                 vtk.symlink(symlink)
-            print("Render tracts for vtk group {}".format(group))
+            print(f"Render tracts for vtk group {group}")
             wm_quality_control_tractography[vtkdir, qcdir] & FG
 
 if __name__ == '__main__':

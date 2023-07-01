@@ -44,7 +44,7 @@ def save_nifti(fname, data, affine, hdr=None):
 
 
 def logfmt(scriptname):
-    return '%(asctime)s ' + scriptname + ' %(levelname)s  %(message)s'
+    return f'%(asctime)s {scriptname} %(levelname)s  %(message)s'
 
 import psutil
 N_CPU= psutil.cpu_count()

@@ -89,12 +89,12 @@ class App(cli.Application):
             logging.error(
                 'Output directory exists, use -f/--force to force an overwrite.')
             sys.exit(1)
-        
+
         if self.t2mask and not self.t2:
             raise AttributeError('--t2mask is invalid without --t2')
-        
 
-        with TemporaryDirectory() as tmpdir, local.env(SUBJECTS_DIR=tmpdir, FSFAST_HOME='', MNI_DIR=''):
+
+        with (TemporaryDirectory() as tmpdir, local.env(SUBJECTS_DIR=tmpdir, FSFAST_HOME='', MNI_DIR='')):
             
             tmpdir = local.path(tmpdir)
 
@@ -106,7 +106,7 @@ class App(cli.Application):
             else:
                 t1 = tmpdir / 't1.nii.gz'
                 self.t1.copy(t1)
-            
+
             subjid = self.t1.stem
             common_params=['-s', subjid]
 
@@ -117,17 +117,17 @@ class App(cli.Application):
                     logging.info('Mask the t2')
                     t2 = tmpdir / 't2masked.nii.gz'
                     ImageMath('3', t2, 'm', self.t2, self.t2mask)
-            
+
                 else:
                     t2 = tmpdir / 't2.nii.gz'
                     self.t2.copy(t2)  
-                
+
                 autorecon3_params= ['-T2', t2, '-T2pial']
-            
+
             if self.subfields:
                 autorecon3_params+=['-subfields']
 
-            logging.info("Running freesurfer on " + t1)
+            logging.info(f"Running freesurfer on {t1}")
 
             if self.ncpu=='-1':
                 self.ncpu= str(N_CPU)
@@ -156,11 +156,11 @@ class App(cli.Application):
             recon_all[common_params, '-autorecon2'] & FG
             recon_all[common_params, '-autorecon3', autorecon3_params] & FG
 
-            
+
             logging.info("Freesurfer done.")
 
             (tmpdir / subjid).copy(self.out, override=True)  # overwrites any existing directory
-            logging.info("Made " + self.out)
+            logging.info(f"Made {self.out}")
 
 
 if __name__ == '__main__':

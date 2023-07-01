@@ -85,16 +85,16 @@ class Eddy(cli.Application):
     def main(self):
 
         from plumbum.cmd import eddy_openmp
-        
+
         if self.useGpu:
             try:
                 from plumbum.cmd import nvcc
                 nvcc['--version'] & FG
-                
+
                 print('\nCUDA found, looking for available GPU\n')
                 from GPUtil import getFirstAvailable
                 getFirstAvailable()
-                
+
                 print('available GPU found, looking for eddy_cuda executable\n'
                       'make sure you have created a softlink according to '
                       'https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/eddy/UsersGuide')
@@ -107,23 +107,23 @@ class Eddy(cli.Application):
 
         prefix= self.dwi_file.name.split('.')[0]
         self.outDir.mkdir()
-        outPrefix = pjoin(self.outDir._path, prefix+'_Ed')
+        outPrefix = pjoin(self.outDir._path, f'{prefix}_Ed')
 
 
         if not self.b0_brain_mask:
             logging.info('Mask not provided, creating mask ...')
 
-            self.b0_brain_mask = outPrefix + '_mask.nii.gz'
+            self.b0_brain_mask = f'{outPrefix}_mask.nii.gz'
 
             bet_mask(self.dwi_file, self.b0_brain_mask, 4, bvalFile= self.bvals_file, BET_THRESHOLD= self.betThreshold)
 
 
         _, _, eddy_openmp_params= obtain_fsl_eddy_params(self.eddy_config_file._path)
-        
+
         print('eddy_openmp/cuda parameters')
         print(eddy_openmp_params)
         print('')
-        
+
         eddy_openmp[f'--imain={self.dwi_file}',
                     f'--mask={self.b0_brain_mask}',
                     f'--acqp={self.acqparams_file}',
@@ -132,15 +132,15 @@ class Eddy(cli.Application):
                     f'--bvals={self.bvals_file}',
                     f'--out={outPrefix}',
                     eddy_openmp_params.split()] & FG
-        
+
         # free space, see https://github.com/pnlbwh/pnlNipype/issues/82
         if '--repol' in eddy_openmp_params:
             rm[f'{outPrefix}.eddy_outlier_free_data.nii.gz'] & FG
-        
-        
+
+
         bvals= np.array(read_bvals(self.bvals_file))
         ind= [i for i in range(len(bvals)) if bvals[i]>B0_THRESHOLD and bvals[i]<= REPOL_BSHELL_GREATER]
-        
+
         if '--repol' in eddy_openmp_params and len(ind):
             
             print('\nDoing eddy_openmp/cuda again without --repol option '
@@ -152,7 +152,7 @@ class Eddy(cli.Application):
             print('')
             wo_repol_outDir= self.outDir.join('wo_repol')
             wo_repol_outDir.mkdir()
-            wo_repol_outPrefix = pjoin(wo_repol_outDir, prefix + '_Ed')
+            wo_repol_outPrefix = pjoin(wo_repol_outDir, f'{prefix}_Ed')
 
             eddy_openmp[f'--imain={self.dwi_file}',
                         f'--mask={self.b0_brain_mask}',
@@ -164,30 +164,37 @@ class Eddy(cli.Application):
                         eddy_openmp_params] & FG
 
 
-            repol_bvecs= np.array(read_bvecs(outPrefix + '.eddy_rotated_bvecs'))
-            wo_repol_bvecs= np.array(read_bvecs(wo_repol_outPrefix + '.eddy_rotated_bvecs'))
+            repol_bvecs = np.array(read_bvecs(f'{outPrefix}.eddy_rotated_bvecs'))
+            wo_repol_bvecs = np.array(
+                read_bvecs(f'{wo_repol_outPrefix}.eddy_rotated_bvecs')
+            )
 
             merged_bvecs= repol_bvecs.copy()
             merged_bvecs[ind,: ]= wo_repol_bvecs[ind,: ]
 
-            repol_data= load_nifti(outPrefix + '.nii.gz')
-            wo_repol_data= load_nifti(wo_repol_outPrefix + '.nii.gz')
+            repol_data = load_nifti(f'{outPrefix}.nii.gz')
+            wo_repol_data = load_nifti(f'{wo_repol_outPrefix}.nii.gz')
             merged_data= repol_data.get_fdata().copy()
             merged_data[...,ind]= wo_repol_data.get_fdata()[...,ind]
 
-            save_nifti(outPrefix + '.nii.gz', merged_data, repol_data.affine, hdr=repol_data.header)
-            
+            save_nifti(
+                f'{outPrefix}.nii.gz',
+                merged_data,
+                repol_data.affine,
+                hdr=repol_data.header,
+            )
+
             # copy bval,bvec to have same prefix as that of eddy corrected volume
-            write_bvecs(outPrefix + '.bvec', merged_bvecs)
-            copyfile(self.bvals_file, outPrefix + '.bval')
-            
+            write_bvecs(f'{outPrefix}.bvec', merged_bvecs)
+            copyfile(self.bvals_file, f'{outPrefix}.bval')
+
             # clean up
             rm['-r', wo_repol_outDir] & FG
-            
+
         else:
             # copy bval,bvec to have same prefix as that of eddy corrected volume
-            copyfile(outPrefix + '.eddy_rotated_bvecs', outPrefix + '.bvec')
-            copyfile(self.bvals_file, outPrefix + '.bval')
+            copyfile(f'{outPrefix}.eddy_rotated_bvecs', f'{outPrefix}.bvec')
+            copyfile(self.bvals_file, f'{outPrefix}.bval')
 
 
 if __name__== '__main__':

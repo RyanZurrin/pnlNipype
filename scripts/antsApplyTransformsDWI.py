@@ -15,7 +15,7 @@ def _WarpImage(dwimask, vol, xfm):
     if dwimask:
         fslmaths[vol, '-mas', dwimask, vol]
 
-    volwarped = vol.stem + '-warped.nii.gz'
+    volwarped = f'{vol.stem}-warped.nii.gz'
     WarpImageMultiTransform('3', vol, volwarped, '-R', vol, xfm)
 
     return volwarped
@@ -38,7 +38,7 @@ class App(cli.Application):
         becomes sluggish/you run into memory error, reduce --nproc''', default= 8)
 
     def main(self):
-        with TemporaryDirectory() as tmpdir, local.cwd(tmpdir):
+        with (TemporaryDirectory() as tmpdir, local.cwd(tmpdir)):
             tmpdir = local.path(tmpdir)
             dicePrefix = 'vol'
 
@@ -46,14 +46,14 @@ class App(cli.Application):
             fslsplit[self.dwi] & FG
 
             logging.info("Apply warp to each DWI volume")
-            vols = sorted(tmpdir // (dicePrefix + '*.nii.gz'))
+            vols = sorted(tmpdir // f'{dicePrefix}*.nii.gz')
 
             # use the following multi-processed loop
             pool= Pool(int(self.nproc))
-            res= []
-            for vol in vols:
-                res.append(pool.apply_async(_WarpImage, (self.dwimask, vol, self.xfm)))
-
+            res = [
+                pool.apply_async(_WarpImage, (self.dwimask, vol, self.xfm))
+                for vol in vols
+            ]
             volsWarped= [r.get() for r in res]
             pool.close()
             pool.join()
@@ -74,13 +74,12 @@ class App(cli.Application):
             fslmerge['-t', self.out, volsWarped] & FG
 
 
-            logging.info('Made ' + str(self.out))
+            logging.info(f'Made {str(self.out)}')
 
             if self.debug:
                 from os import getpid
                 pid = str(getpid())
-                d = local.path(self.out.dirname /
-                               ('antsApplyTransformsDWi-' + pid))
+                d = local.path(self.out.dirname / f'antsApplyTransformsDWi-{pid}')
                 tmpdir.copy(d)
 
 

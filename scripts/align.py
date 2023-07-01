@@ -36,10 +36,10 @@ def axis_align_dwi(hdr_in, bvec_file, bval_file, out_prefix):
 
     # bvecs are in IJK space, so no change due to axis alignment
     # rename the bvec file
-    bvec_file.copy(out_prefix+'.bvec')
+    bvec_file.copy(f'{out_prefix}.bvec')
 
     # rename the bval file
-    bval_file.copy(out_prefix+'.bval')
+    bval_file.copy(f'{out_prefix}.bval')
 
     return spcdir_new
 
@@ -155,9 +155,9 @@ class Xalign(cli.Application):
 
 
             # rename the bval file
-            self.bval_file.copy(self.out_prefix + '.bval')
+            self.bval_file.copy(f'{self.out_prefix}.bval')
             # rename the bvec file
-            self.bvec_file.copy(self.out_prefix + '.bvec')
+            self.bvec_file.copy(f'{self.out_prefix}.bvec')
 
 
         else: # self.axisAlign and self.center:
@@ -175,7 +175,12 @@ class Xalign(cli.Application):
 
 
         # write out the modified image
-        save_nifti(self.out_prefix+'.nii.gz', mri.get_data(), hdr_out.get_best_affine(), hdr_out)
+        save_nifti(
+            f'{self.out_prefix}.nii.gz',
+            mri.get_data(),
+            hdr_out.get_best_affine(),
+            hdr_out,
+        )
 
 
 if __name__ == '__main__':

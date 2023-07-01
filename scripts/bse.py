@@ -68,48 +68,44 @@ class App(cli.Application):
         self.b0_threshold= float(self.b0_threshold)
 
         if self.out is None:
-            self.out= os.path.join(directory, prefix+'_bse.nii.gz')
+            self.out = os.path.join(directory, f'{prefix}_bse.nii.gz')
 
-        if self.dwi.endswith('.nii') or self.dwi.endswith('.nii.gz'):
+        if not self.dwi.endswith('.nii') and not self.dwi.endswith('.nii.gz'):
+            raise Exception("Invalid dwi format, must be a nifti image")
 
-            if not self.bval_file:
-                self.bval_file= os.path.join(directory, prefix+'.bval')
+        if not self.bval_file:
+            self.bval_file = os.path.join(directory, f'{prefix}.bval')
 
-            bvals= read_bvals(self.bval_file)
-            idx= np.where([bval < self.b0_threshold for bval in bvals])[0]
+        bvals= read_bvals(self.bval_file)
+        idx= np.where([bval < self.b0_threshold for bval in bvals])[0]
 
 
-            if len(idx)>=1:
+        if len(idx) < 1:
+            raise Exception('No b0 image found. Check the bval file.')
+
 
                 # default is the first b0
-                if not (self.minimum or self.average or self.all):
-                    fslroi[self.dwi, self.out, idx, 1] & FG
+        if not self.minimum and not self.average and not self.all:
+            fslroi[self.dwi, self.out, idx, 1] & FG
 
-                elif self.minimum:
-                    fslroi[self.dwi, self.out, idx, np.argsort(bvals)[0]] & FG
+        elif self.minimum:
+            fslroi[self.dwi, self.out, idx, np.argsort(bvals)[0]] & FG
 
-                elif self.average:
-                    # Load the given dwi to get image data
-                    dwi= load_nifti(self.dwi._path)
-                    hdr= dwi.header
-                    mri= dwi.get_data()
+        elif self.average:
+            # Load the given dwi to get image data
+            dwi= load_nifti(self.dwi._path)
+            hdr= dwi.header
+            mri= dwi.get_data()
 
-                    avg_bse= np.mean(mri[:,:,:,idx], axis= 3)
+            avg_bse= np.mean(mri[:,:,:,idx], axis= 3)
 
-                    # Now write back the average bse
-                    save_nifti(self.out, avg_bse, dwi.affine, hdr)
-
-
-                elif self.all:
-                    fslroi[self.dwi, self.out, idx, len(idx)] & FG
-
-
-            else:
-                raise Exception('No b0 image found. Check the bval file.')
+            # Now write back the average bse
+            save_nifti(self.out, avg_bse, dwi.affine, hdr)
 
 
         else:
-            raise Exception("Invalid dwi format, must be a nifti image")
+            fslroi[self.dwi, self.out, idx, len(idx)] & FG
+
 
         if self.dwimask:
             ImageMath(3, self.out, 'm', self.out, self.dwimask)

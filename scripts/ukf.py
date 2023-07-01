@@ -61,12 +61,12 @@ class App(cli.Application):
                 from conversion import grad_remove
 
                 bhigh_prefix= tmpdir / self.dwi.stem+ f'_bhigh_{self.bhigh}'
-                bhigh_dwi= bhigh_prefix+'.nii.gz'
+                bhigh_dwi = f'{bhigh_prefix}.nii.gz'
                 grad_remove(shortdwi._path, bhigh_dwi, interval=[int(self.bhigh)+50,1e6], bvalFile=self.bvalFile, bvecFile=self.bvecFile)
 
                 shortdwi= local.path(bhigh_dwi)
-                self.bvalFile = local.path(bhigh_prefix + '.bval')
-                self.bvecFile = local.path(bhigh_prefix + '.bvec')
+                self.bvalFile = local.path(f'{bhigh_prefix}.bval')
+                self.bvecFile = local.path(f'{bhigh_prefix}.bvec')
 
                 # preserve the filtered attributes in case the user wants to run UKFTractography separately in future
                 shortdwi.copy(self.dwi.dirname)
@@ -101,7 +101,7 @@ class App(cli.Application):
                       '--seedsFile', tmpdwimask, '--tracts', self.out] + list(ukfdefaults) + key_val_pair
 
 
-            logging.info('Peforming UKF tractography of {}'.format(tmpdwi))
+            logging.info(f'Peforming UKF tractography of {tmpdwi}')
             UKFTractography[params] & FG
 
 

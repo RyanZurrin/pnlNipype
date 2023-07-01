@@ -61,13 +61,13 @@ class App(cli.Application):
             # tract_math(ukf, 'tract_remove_short_tracts', '2', ukfpruned)
             tract_math[ukf, 'tract_remove_short_tracts', '2', ukfpruned] & FG
             if not ukfpruned.exists():
-                raise Exception("tract_math failed to make '{}'".format(ukfpruned))
-            
+                raise Exception(f"tract_math failed to make '{ukfpruned}'")
+
             self.out=local.path(self.out)
             if self.out.exists():
                 self.out.delete()
             self.out.mkdir()
-            
+
             tract_querier['-t', ukfpruned, '-a', fsindwi, '-q', self.query, '-o', self.out / '_'] & FG
 
             logging.info('Convert vtk field data to tensor data')

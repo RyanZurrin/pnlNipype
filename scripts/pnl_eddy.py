@@ -49,12 +49,12 @@ class App(cli.Application):
             if self.overwrite:
                 self.out.delete()
             else:
-                logging.error("{} exists, use '--force' to overwrite it".format(self.out))
+                logging.error(f"{self.out} exists, use '--force' to overwrite it")
                 sys.exit(1)
 
         outxfms = self.out.dirname / self.out.stem+'_xfms.tgz'
 
-        with TemporaryDirectory() as tmpdir, local.cwd(tmpdir):
+        with (TemporaryDirectory() as tmpdir, local.cwd(tmpdir)):
             tmpdir = local.path(tmpdir)
 
             dicePrefix = 'vol'
@@ -67,7 +67,7 @@ class App(cli.Application):
                                    '--bvals', self.bvalFile, '-o', 'b0.nii.gz']), shell= True)
 
             logging.info('Register each volume to the B0')
-            vols = sorted(tmpdir // (dicePrefix + '*.nii.gz'))
+            vols = sorted(tmpdir // f'{dicePrefix}*.nii.gz')
 
             # use the following multi-processed loop
             pool= Pool(int(self.nproc))
@@ -94,7 +94,7 @@ class App(cli.Application):
 
 
             fslmerge('-t', 'EddyCorrect-DWI.nii.gz', volsRegistered)
-            transforms = tmpdir.glob(dicePrefix+'*.txt')
+            transforms = tmpdir.glob(f'{dicePrefix}*.txt')
             transforms.sort()
 
 
@@ -104,7 +104,7 @@ class App(cli.Application):
             bvecs_new= bvecs.copy()
             for (i,t) in enumerate(transforms):
 
-                logging.info('Apply ' + t)
+                logging.info(f'Apply {t}')
                 tra = np.loadtxt(t)
 
                 # removes the translation
@@ -128,16 +128,16 @@ class App(cli.Application):
             tar('cvzf', outxfms, transforms)
 
             # save modified bvecs
-            write_bvecs(self.out._path+'.bvec', bvecs_new)
+            write_bvecs(f'{self.out._path}.bvec', bvecs_new)
 
             # save EddyCorrect-DWI
-            local.path('EddyCorrect-DWI.nii.gz').copy(self.out._path+'.nii.gz')
+            local.path('EddyCorrect-DWI.nii.gz').copy(f'{self.out._path}.nii.gz')
 
             # copy bvals
-            self.bvalFile.copy(self.out._path+'.bval')
+            self.bvalFile.copy(f'{self.out._path}.bval')
 
             if self.debug:
-                tmpdir.copy(pjoin(dirname(self.out),"eddy-debug-"+str(getpid())))
+                tmpdir.copy(pjoin(dirname(self.out), f"eddy-debug-{str(getpid())}"))
 
 
 if __name__ == '__main__':
